@@ -160,6 +160,71 @@ class PostgreSQLBackend(DatabaseBackend):
             logger.error(f"Failed to create PostgreSQL database tables: {e}")
             raise
 
+    def is_database_initialized(self) -> bool:
+        """Check if database tables exist and are properly initialized."""
+        try:
+            from sqlalchemy import inspect
+            inspector = inspect(self.engine)
+            
+            # Check if all required tables exist
+            required_tables = {'users', 'conversations', 'messages'}
+            existing_tables = set(inspector.get_table_names())
+            
+            tables_exist = required_tables.issubset(existing_tables)
+            
+            if tables_exist:
+                logger.debug("Database tables exist")
+                return True
+            else:
+                missing_tables = required_tables - existing_tables
+                logger.debug(f"Missing database tables: {missing_tables}")
+                return False
+                
+        except Exception as e:
+            logger.warning(f"Could not check database initialization status: {e}")
+            return False
+
+    def has_admin_users(self) -> bool:
+        """Check if any admin users exist in the database."""
+        try:
+            session = self._get_session()
+            try:
+                admin_count = (
+                    session.query(SQLAlchemyUser)
+                    .filter(SQLAlchemyUser.role == "admin", SQLAlchemyUser.is_active.is_(True))
+                    .count()
+                )
+                return admin_count > 0
+            finally:
+                session.close()
+        except Exception as e:
+            logger.warning(f"Could not check for admin users: {e}")
+            return False
+
+    def ensure_database_ready(self) -> bool:
+        """Ensure database is initialized and has at least one admin user."""
+        try:
+            # Check if database is initialized
+            if not self.is_database_initialized():
+                logger.info("Database not initialized, creating tables...")
+                self.init_db()
+                logger.info("Database tables created successfully")
+            else:
+                logger.debug("Database tables already exist")
+            
+            # Check if admin users exist
+            if not self.has_admin_users():
+                logger.info("No admin users found, prompting for admin user creation...")
+                return False  # Caller should handle admin user creation
+            else:
+                logger.debug("Admin users exist")
+                
+            return True
+            
+        except Exception as e:
+            logger.error(f"Failed to ensure database is ready: {e}")
+            raise
+
     def create_admin_user(self, username: str, email: str, password: str) -> bool:
         """Create an admin user if it doesn't exist."""
         session = self._get_session()

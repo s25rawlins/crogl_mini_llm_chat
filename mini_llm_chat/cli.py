@@ -466,6 +466,22 @@ def main() -> None:
                 f"Database backend: {backend_info['name']} ({backend_info['type']})"
             )
 
+            # Check if admin user setup is needed for PostgreSQL
+            if backend_info["type"] == "postgresql" and hasattr(backend, 'has_admin_users'):
+                if not backend.has_admin_users():
+                    print("No admin users found. Setting up initial admin user...")
+                    try:
+                        success = setup_initial_admin()
+                        if success:
+                            print("Admin user created successfully!")
+                            logger.info("Admin user created during startup")
+                        else:
+                            print("Admin user setup skipped (user already exists)")
+                    except Exception as e:
+                        logger.error(f"Admin user setup failed: {e}")
+                        print(f"Admin user setup failed: {e}")
+                        print("You can create an admin user later with: --setup-admin")
+
             # Display backend information
             if backend_info["type"] == "memory":
                 print(f"Database: {backend_info['name']} (In-Memory)")

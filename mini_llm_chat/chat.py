@@ -110,15 +110,45 @@ def run_chat_repl(api_key: str, max_calls: int, time_window: int) -> None:
     logger.info(f"Rate limit: {max_calls} calls per {time_window} seconds")
     logger.info(f"Using model: {DEFAULT_MODEL}")
 
-    # Create new conversation
-    conversation = create_conversation(user.id)
+    # Try to resume the last conversation or create a new one
+    conversation = None
+    
+    # First, try to get the user's most recent conversation
+    try:
+        backend = db_manager.get_backend()
+        
+        # Get the most recent conversation for this user
+        if hasattr(backend, '_get_session'):
+            session = backend._get_session()
+            try:
+                from mini_llm_chat.backends.postgresql import SQLAlchemyConversation
+                last_conversation = (
+                    session.query(SQLAlchemyConversation)
+                    .filter(SQLAlchemyConversation.user_id == user.id)
+                    .order_by(SQLAlchemyConversation.updated_at.desc())
+                    .first()
+                )
+                if last_conversation:
+                    conversation = backend._convert_conversation(last_conversation)
+                    logger.info(f"Resuming conversation {conversation.id}: '{conversation.title}'")
+            finally:
+                session.close()
+    except Exception as e:
+        logger.warning(f"Could not resume last conversation: {e}")
+    
+    # If no existing conversation found, create a new one
     if not conversation:
-        logger.error("Failed to create conversation")
-        print("Failed to create conversation. Please try again.")
-        return
-
-    # Add system message to conversation
-    add_message(conversation.id, "system", SYSTEM_INSTRUCTION)
+        conversation = create_conversation(user.id)
+        if not conversation:
+            logger.error("Failed to create conversation")
+            print("Failed to create conversation. Please try again.")
+            return
+        
+        # Add system message to new conversation
+        add_message(conversation.id, "system", SYSTEM_INSTRUCTION)
+        logger.info(f"Created new conversation {conversation.id}")
+    else:
+        print(f"Resuming conversation: '{conversation.title}'")
 
     # Display welcome message
     print("Mini LLM Chat REPL (Authenticated)")

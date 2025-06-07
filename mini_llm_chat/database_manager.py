@@ -81,7 +81,16 @@ class DatabaseManager:
 
         # Initialize the backend
         try:
-            self.backend.init_db()
+            # For PostgreSQL backends, use smart initialization
+            if hasattr(self.backend, 'ensure_database_ready'):
+                admin_needed = not self.backend.ensure_database_ready()
+                if admin_needed:
+                    logger.info("Database ready but no admin users found")
+                    # We'll handle admin user creation in the CLI
+            else:
+                # For other backends, use traditional initialization
+                self.backend.init_db()
+            
             self._initialized = True
             backend_name = self.backend.get_backend_info()["name"]
             logger.info(f"Database backend initialized: {backend_name}")
