@@ -455,6 +455,8 @@ def main() -> None:
 
         # Initialize database backend (only after API key validation)
         try:
+            print("Initializing database...")
+            
             backend = initialize_database(
                 backend_type=args.db_backend,
                 fallback_to_memory=args.fallback_to_memory,
@@ -467,7 +469,9 @@ def main() -> None:
             )
 
             # Check if admin user setup is needed for PostgreSQL
-            if backend_info["type"] == "postgresql" and hasattr(backend, 'has_admin_users'):
+            if backend_info["type"] == "postgresql" and hasattr(
+                backend, "has_admin_users"
+            ):
                 if not backend.has_admin_users():
                     print("No admin users found. Setting up initial admin user...")
                     try:
@@ -494,7 +498,60 @@ def main() -> None:
 
         except DatabaseConnectionError as e:
             logger.error(f"Database initialization failed: {e}")
-            print(f"Database initialization failed: {e}")
+            
+            # Provide helpful error messages based on the error type
+            error_msg = str(e).lower()
+            if "not installed" in error_msg:
+                print("\n" + "="*60)
+                print("PostgreSQL Installation Required")
+                print("="*60)
+                print(str(e))
+                print("\nTo resolve this issue:")
+                print("1. Install PostgreSQL on your system")
+                print("2. Run the application again")
+                print("3. Or use in-memory mode: --db-backend memory")
+                print("="*60)
+            elif "not running" in error_msg or "could not be started" in error_msg:
+                print("\n" + "="*60)
+                print("PostgreSQL Service Issue")
+                print("="*60)
+                print(str(e))
+                print("\nTo resolve this issue:")
+                print("1. Start PostgreSQL service manually:")
+                print("   - Linux: sudo systemctl start postgresql")
+                print("   - macOS: brew services start postgresql")
+                print("   - Windows: net start postgresql")
+                print("2. Run the application again")
+                print("3. Or use in-memory mode: --db-backend memory")
+                print("="*60)
+            elif "does not exist" in error_msg and "could not be created" in error_msg:
+                print("\n" + "="*60)
+                print("PostgreSQL Database Issue")
+                print("="*60)
+                print(str(e))
+                print("\nTo resolve this issue:")
+                print("1. Create the database manually:")
+                print("   createdb mini_llm_chat")
+                print("2. Check database permissions")
+                print("3. Verify your DATABASE_URL is correct")
+                print("4. Or use in-memory mode: --db-backend memory")
+                print("="*60)
+            elif "cannot connect" in error_msg:
+                print("\n" + "="*60)
+                print("PostgreSQL Connection Issue")
+                print("="*60)
+                print(str(e))
+                print("\nTo resolve this issue:")
+                print("1. Check your DATABASE_URL is correct")
+                print("2. Verify PostgreSQL is accepting connections")
+                print("3. Check authentication credentials")
+                print("4. Or use in-memory mode: --db-backend memory")
+                print("="*60)
+            else:
+                print(f"\nDatabase initialization failed: {e}")
+                print("\nYou can try using in-memory mode instead:")
+                print("  mini-llm-chat --db-backend memory")
+            
             sys.exit(1)
 
         # Display startup information

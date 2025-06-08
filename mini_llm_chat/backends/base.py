@@ -6,7 +6,7 @@ It provides a consistent API for database operations regardless of the underlyin
 """
 
 from abc import ABC, abstractmethod
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import List, Optional
 
 
@@ -96,7 +96,7 @@ class User:
         self.hashed_password = hashed_password
         self.role = role
         self.is_active = is_active
-        self.created_at = created_at or datetime.utcnow()
+        self.created_at = created_at or datetime.now(UTC)
         self.last_login = last_login
 
     def set_password(self, password: str) -> None:
@@ -137,7 +137,7 @@ class User:
             "user_id": self.id,
             "username": self.username,
             "role": self.role,
-            "exp": datetime.utcnow() + timedelta(hours=JWT_EXPIRATION_HOURS),
+            "exp": datetime.now(UTC) + timedelta(hours=JWT_EXPIRATION_HOURS),
         }
         return jwt.encode(payload, JWT_SECRET_KEY, algorithm=JWT_ALGORITHM)
 
@@ -180,8 +180,8 @@ class Conversation:
         self.id = id
         self.user_id = user_id
         self.title = title
-        self.created_at = created_at or datetime.utcnow()
-        self.updated_at = updated_at or datetime.utcnow()
+        self.created_at = created_at or datetime.now(UTC)
+        self.updated_at = updated_at or datetime.now(UTC)
 
 
 class Message:
@@ -201,4 +201,4 @@ class Message:
         self.role = role
         self.content = content
         self.token_count = token_count
-        self.created_at = created_at or datetime.utcnow()
+        self.created_at = created_at or datetime.now(UTC)

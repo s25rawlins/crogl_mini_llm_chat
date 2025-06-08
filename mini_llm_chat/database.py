@@ -7,7 +7,7 @@ It uses SQLAlchemy for ORM functionality and supports PostgreSQL as the primary 
 
 import logging
 import os
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from typing import List, Optional
 
 import bcrypt
@@ -53,7 +53,7 @@ class User(Base):
     hashed_password = Column(String(255), nullable=False)
     role = Column(String(20), default="user", nullable=False)  # 'admin' or 'user'
     is_active = Column(Boolean, default=True, nullable=False)
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    created_at = Column(DateTime, default=lambda: datetime.now(UTC), nullable=False)
     last_login = Column(DateTime, nullable=True)
 
     # Relationship to conversations
@@ -82,7 +82,7 @@ class User(Base):
             "user_id": self.id,
             "username": self.username,
             "role": self.role,
-            "exp": datetime.utcnow() + timedelta(hours=JWT_EXPIRATION_HOURS),
+            "exp": datetime.now(UTC) + timedelta(hours=JWT_EXPIRATION_HOURS),
         }
         return jwt.encode(payload, JWT_SECRET_KEY, algorithm=JWT_ALGORITHM)
 
@@ -112,9 +112,12 @@ class Conversation(Base):
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     title = Column(String(200), nullable=True)
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    created_at = Column(DateTime, default=lambda: datetime.now(UTC), nullable=False)
     updated_at = Column(
-        DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False
+        DateTime,
+        default=lambda: datetime.now(UTC),
+        onupdate=lambda: datetime.now(UTC),
+        nullable=False,
     )
 
     # Relationships
@@ -138,7 +141,7 @@ class Message(Base):
     role = Column(String(20), nullable=False)  # 'user', 'assistant', 'system'
     content = Column(Text, nullable=False)
     token_count = Column(Integer, nullable=True)
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    created_at = Column(DateTime, default=lambda: datetime.now(UTC), nullable=False)
 
     # Relationship
     conversation = relationship("Conversation", back_populates="messages")
@@ -201,7 +204,7 @@ def authenticate_user(username: str, password: str) -> Optional[User]:
 
         if user and user.verify_password(password):
             # Update last login
-            user.last_login = datetime.utcnow()
+            user.last_login = datetime.now(UTC)
             db.commit()
             # Refresh the user object to ensure all attributes are loaded
             db.refresh(user)
@@ -250,7 +253,7 @@ def create_conversation(
     try:
         conversation = Conversation(
             user_id=user_id,
-            title=title or f"Chat {datetime.utcnow().strftime('%Y-%m-%d %H:%M')}",
+            title=title or f"Chat {datetime.now(UTC).strftime('%Y-%m-%d %H:%M')}",
         )
         db.add(conversation)
         db.commit()

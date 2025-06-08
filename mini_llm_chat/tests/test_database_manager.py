@@ -43,13 +43,14 @@ class TestDatabaseManager:
             "type": "postgresql",
         }
         mock_backend.supports_persistence.return_value = True
+        mock_backend.ensure_database_ready.return_value = True
         mock_postgresql.return_value = mock_backend
 
         backend = self.manager.initialize_backend("postgresql")
 
         assert backend == mock_backend
         mock_postgresql.assert_called_once()
-        mock_backend.init_db.assert_called_once()
+        mock_backend.ensure_database_ready.assert_called_once()
 
     @patch("mini_llm_chat.database_manager.PostgreSQLBackend")
     def test_initialize_postgresql_with_fallback(self, mock_postgresql):

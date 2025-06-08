@@ -57,6 +57,8 @@ class DatabaseManager:
             logger.info("Initializing PostgreSQL database backend")
             try:
                 self.backend = PostgreSQLBackend(database_url)
+                # Perform comprehensive PostgreSQL system checks
+                self.backend.ensure_postgresql_system_ready()
             except Exception as e:
                 if fallback_to_memory:
                     logger.warning(f"PostgreSQL initialization failed: {e}")
@@ -69,8 +71,12 @@ class DatabaseManager:
         elif backend_type == "auto":
             # Try PostgreSQL first, fallback to memory
             try:
-                logger.info("Auto-detecting database backend (trying PostgreSQL first)")
+                logger.info(
+                    "Auto-detecting database backend (trying PostgreSQL first)"
+                )
                 self.backend = PostgreSQLBackend(database_url)
+                # Perform comprehensive PostgreSQL system checks
+                self.backend.ensure_postgresql_system_ready()
                 logger.info("Successfully initialized PostgreSQL backend")
             except Exception as e:
                 logger.warning(f"PostgreSQL not available: {e}")
@@ -82,7 +88,7 @@ class DatabaseManager:
         # Initialize the backend
         try:
             # For PostgreSQL backends, use smart initialization
-            if hasattr(self.backend, 'ensure_database_ready'):
+            if hasattr(self.backend, "ensure_database_ready"):
                 admin_needed = not self.backend.ensure_database_ready()
                 if admin_needed:
                     logger.info("Database ready but no admin users found")
@@ -90,7 +96,7 @@ class DatabaseManager:
             else:
                 # For other backends, use traditional initialization
                 self.backend.init_db()
-            
+
             self._initialized = True
             backend_name = self.backend.get_backend_info()["name"]
             logger.info(f"Database backend initialized: {backend_name}")

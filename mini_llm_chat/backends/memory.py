@@ -7,7 +7,7 @@ Data is not persisted between application sessions.
 """
 
 import logging
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Dict, List, Optional
 
 from .base import Conversation as BaseConversation
@@ -50,7 +50,7 @@ class InMemoryBackend(DatabaseBackend):
             hashed_password="",  # No password needed for session user
             role="user",
             is_active=True,
-            created_at=datetime.utcnow(),
+            created_at=datetime.now(UTC),
         )
 
         self.users[session_user.id] = session_user
@@ -74,7 +74,7 @@ class InMemoryBackend(DatabaseBackend):
             hashed_password="",  # Will be set by set_password
             role="admin",
             is_active=True,
-            created_at=datetime.utcnow(),
+            created_at=datetime.now(UTC),
         )
 
         admin_user.set_password(password)
@@ -99,12 +99,12 @@ class InMemoryBackend(DatabaseBackend):
 
             # For session user, allow any password
             if username == "session_user":
-                user.last_login = datetime.utcnow()
+                user.last_login = datetime.now(UTC)
                 return user
 
             # For regular users, verify password
             if user.verify_password(password):
-                user.last_login = datetime.utcnow()
+                user.last_login = datetime.now(UTC)
                 return user
 
             return None
@@ -141,9 +141,9 @@ class InMemoryBackend(DatabaseBackend):
             conversation = BaseConversation(
                 id=self._next_conversation_id,
                 user_id=user_id,
-                title=title or f"Chat {datetime.utcnow().strftime('%Y-%m-%d %H:%M')}",
-                created_at=datetime.utcnow(),
-                updated_at=datetime.utcnow(),
+                title=title or f"Chat {datetime.now(UTC).strftime('%Y-%m-%d %H:%M')}",
+                created_at=datetime.now(UTC),
+                updated_at=datetime.now(UTC),
             )
 
             self.conversations[conversation.id] = conversation
@@ -175,7 +175,7 @@ class InMemoryBackend(DatabaseBackend):
                 role=role,
                 content=content,
                 token_count=token_count,
-                created_at=datetime.utcnow(),
+                created_at=datetime.now(UTC),
             )
 
             self.messages[message.id] = message
@@ -183,7 +183,7 @@ class InMemoryBackend(DatabaseBackend):
 
             # Update conversation timestamp
             conversation = self.conversations[conversation_id]
-            conversation.updated_at = datetime.utcnow()
+            conversation.updated_at = datetime.now(UTC)
 
             logger.debug(
                 f"Added message {message.id} to conversation {conversation_id}"
@@ -307,7 +307,7 @@ class InMemoryBackend(DatabaseBackend):
             hashed_password="",
             role="user",
             is_active=True,
-            created_at=datetime.utcnow(),
+            created_at=datetime.now(UTC),
         )
 
         self.users[session_user.id] = session_user

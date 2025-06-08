@@ -2,7 +2,8 @@
 PostgreSQL Database Backend
 
 This module implements the PostgreSQL backend for the Mini LLM Chat application.
-It wraps the existing SQLAlchemy-based database functionality.
+It wraps the existing SQLAlchemy-based database functionality and includes
+comprehensive PostgreSQL system initialization and management.
 """
 
 import logging
@@ -29,6 +30,7 @@ from .base import (
 )
 from .base import Message as BaseMessage
 from .base import User as BaseUser
+from ..utils.postgresql_utils import ensure_postgresql_ready, get_postgresql_status
 
 logger = logging.getLogger(__name__)
 
@@ -111,6 +113,55 @@ class PostgreSQLBackend(DatabaseBackend):
             logger.error(f"Failed to initialize PostgreSQL backend: {e}")
             raise
 
+    def ensure_postgresql_system_ready(self) -> bool:
+        """
+        Ensure PostgreSQL system is ready for use.
+        
+        This method performs comprehensive system-level checks:
+        1. Verify PostgreSQL is installed
+        2. Check if PostgreSQL service is running, start if needed
+        3. Verify database exists, create if needed
+        4. Test database connection
+        
+        Returns:
+            bool: True if PostgreSQL system is ready, False otherwise
+            
+        Raises:
+            Exception: If there are unrecoverable errors
+        """
+        try:
+            logger.info("Performing comprehensive PostgreSQL system checks...")
+            
+            # Get system status first
+            status = get_postgresql_status()
+            
+            if not status["installed"]:
+                logger.error("PostgreSQL is not installed on this system")
+                raise Exception(
+                    "PostgreSQL is not installed. Please install PostgreSQL and try again.\n"
+                    "Installation guides:\n"
+                    "  Ubuntu/Debian: sudo apt-get install postgresql postgresql-contrib\n"
+                    "  CentOS/RHEL: sudo yum install postgresql-server postgresql-contrib\n"
+                    "  macOS: brew install postgresql\n"
+                    "  Windows: Download from https://www.postgresql.org/download/windows/"
+                )
+            
+            logger.info(f"PostgreSQL installation found: {status.get('version', 'Unknown version')}")
+            
+            # Use the comprehensive system readiness check
+            success, error_message = ensure_postgresql_ready(self.database_url)
+            
+            if not success:
+                logger.error(f"PostgreSQL system check failed: {error_message}")
+                raise Exception(error_message)
+            
+            logger.info("PostgreSQL system is ready")
+            return True
+            
+        except Exception as e:
+            logger.error(f"PostgreSQL system readiness check failed: {e}")
+            raise
+
     def _get_session(self) -> Session:
         """Get database session."""
         return self.SessionLocal()
@@ -164,14 +215,15 @@ class PostgreSQLBackend(DatabaseBackend):
         """Check if database tables exist and are properly initialized."""
         try:
             from sqlalchemy import inspect
+
             inspector = inspect(self.engine)
-            
+
             # Check if all required tables exist
-            required_tables = {'users', 'conversations', 'messages'}
+            required_tables = {"users", "conversations", "messages"}
             existing_tables = set(inspector.get_table_names())
-            
+
             tables_exist = required_tables.issubset(existing_tables)
-            
+
             if tables_exist:
                 logger.debug("Database tables exist")
                 return True
@@ -179,7 +231,7 @@ class PostgreSQLBackend(DatabaseBackend):
                 missing_tables = required_tables - existing_tables
                 logger.debug(f"Missing database tables: {missing_tables}")
                 return False
-                
+
         except Exception as e:
             logger.warning(f"Could not check database initialization status: {e}")
             return False
@@ -191,7 +243,10 @@ class PostgreSQLBackend(DatabaseBackend):
             try:
                 admin_count = (
                     session.query(SQLAlchemyUser)
-                    .filter(SQLAlchemyUser.role == "admin", SQLAlchemyUser.is_active.is_(True))
+                    .filter(
+                        SQLAlchemyUser.role == "admin",
+                        SQLAlchemyUser.is_active.is_(True),
+                    )
                     .count()
                 )
                 return admin_count > 0
@@ -211,16 +266,18 @@ class PostgreSQLBackend(DatabaseBackend):
                 logger.info("Database tables created successfully")
             else:
                 logger.debug("Database tables already exist")
-            
+
             # Check if admin users exist
             if not self.has_admin_users():
-                logger.info("No admin users found, prompting for admin user creation...")
+                logger.info(
+                    "No admin users found, prompting for admin user creation..."
+                )
                 return False  # Caller should handle admin user creation
             else:
                 logger.debug("Admin users exist")
-                
+
             return True
-            
+
         except Exception as e:
             logger.error(f"Failed to ensure database is ready: {e}")
             raise
