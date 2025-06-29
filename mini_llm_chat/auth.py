@@ -1,11 +1,3 @@
-"""
-Authentication Module
-
-This module handles user authentication, authorization, and session management
-for the Mini LLM Chat application. It provides token-based authentication
-and role-based access control.
-"""
-
 import getpass
 import logging
 import os
@@ -22,27 +14,14 @@ logger = logging.getLogger(__name__)
 
 
 class AuthenticationError(Exception):
-    """Raised when authentication fails."""
-
     pass
 
 
 class AuthorizationError(Exception):
-    """Raised when user lacks required permissions."""
-
     pass
 
 
 def login_user() -> Tuple[User, str]:
-    """
-    Interactive login process for CLI users.
-
-    Returns:
-        Tuple[User, str]: Authenticated user and JWT token
-
-    Raises:
-        AuthenticationError: If login fails
-    """
     print("Authentication Required")
     print("=" * 30)
 
@@ -88,15 +67,6 @@ def login_user() -> Tuple[User, str]:
 
 
 def login_with_token(token: str) -> Optional[User]:
-    """
-    Authenticate user with JWT token.
-
-    Args:
-        token (str): JWT token
-
-    Returns:
-        Optional[User]: Authenticated user or None if invalid
-    """
     try:
         user = get_user_by_token(token)
         if user:
@@ -111,15 +81,6 @@ def login_with_token(token: str) -> Optional[User]:
 
 
 def require_admin(user: User) -> None:
-    """
-    Check if user has admin privileges.
-
-    Args:
-        user (User): User to check
-
-    Raises:
-        AuthorizationError: If user is not an admin
-    """
     if not user.is_admin():
         logger.warning(
             f"User '{user.username}' attempted admin action without privileges"
@@ -128,12 +89,6 @@ def require_admin(user: User) -> None:
 
 
 def setup_initial_admin() -> bool:
-    """
-    Set up initial admin user if none exists.
-
-    Returns:
-        bool: True if admin was created, False if already exists
-    """
     print("Initial Setup - Create Admin User")
     print("=" * 40)
 
@@ -177,28 +132,11 @@ def setup_initial_admin() -> bool:
 
 
 def get_auth_from_env() -> Optional[str]:
-    """
-    Get authentication token from environment variable.
-
-    Returns:
-        Optional[str]: JWT token if found in environment
-    """
     return os.getenv("MINI_LLM_CHAT_TOKEN")
 
 
 def save_token_to_env_file(token: str, env_file: str = ".env") -> bool:
-    """
-    Save authentication token to environment file.
-
-    Args:
-        token (str): JWT token to save
-        env_file (str): Path to environment file
-
-    Returns:
-        bool: True if successful
-    """
     try:
-        # Read existing env file
         env_vars = {}
         if os.path.exists(env_file):
             with open(env_file, "r") as f:
@@ -208,10 +146,8 @@ def save_token_to_env_file(token: str, env_file: str = ".env") -> bool:
                         key, value = line.split("=", 1)
                         env_vars[key.strip()] = value.strip()
 
-        # Update token
         env_vars["MINI_LLM_CHAT_TOKEN"] = token
 
-        # Write back to file
         with open(env_file, "w") as f:
             f.write("# Mini LLM Chat Environment Variables\n")
             for key, value in env_vars.items():
@@ -225,21 +161,6 @@ def save_token_to_env_file(token: str, env_file: str = ".env") -> bool:
 
 
 def interactive_auth() -> Tuple[User, str]:
-    """
-    Interactive authentication process.
-
-    This function handles the complete authentication flow:
-    1. Check for existing token in environment
-    2. If no token, prompt for login
-    3. Return authenticated user and token
-
-    Returns:
-        Tuple[User, str]: Authenticated user and JWT token
-
-    Raises:
-        AuthenticationError: If authentication fails
-    """
-    # Check for existing token
     existing_token = get_auth_from_env()
     if existing_token:
         user = login_with_token(existing_token)
@@ -249,10 +170,8 @@ def interactive_auth() -> Tuple[User, str]:
         else:
             print("Existing token is invalid or expired")
 
-    # Interactive login
     user, token = login_user()
 
-    # Offer to save token
     save_token = input("\nSave authentication token? (y/N): ").strip().lower()
     if save_token in ["y", "yes"]:
         if save_token_to_env_file(token):
@@ -264,40 +183,17 @@ def interactive_auth() -> Tuple[User, str]:
 
 
 def check_permissions(user: User, required_role: str = "user") -> bool:
-    """
-    Check if user has required permissions.
-
-    Args:
-        user (User): User to check
-        required_role (str): Required role ("user" or "admin")
-
-    Returns:
-        bool: True if user has required permissions
-    """
     if required_role == "admin":
         return user.is_admin()
     elif required_role == "user":
-        return True  # All authenticated users have user permissions
+        return True
     else:
         logger.warning(f"Unknown role requirement: {required_role}")
         return False
 
 
 def logout_user(token: str) -> bool:
-    """
-    Logout user by invalidating token.
-
-    Note: With JWT tokens, we can't truly invalidate them server-side
-    without maintaining a blacklist. For now, we just remove from env.
-
-    Args:
-        token (str): Token to invalidate
-
-    Returns:
-        bool: True if successful
-    """
     try:
-        # Remove token from environment file
         env_file = ".env"
         if os.path.exists(env_file):
             env_vars = {}
@@ -309,7 +205,6 @@ def logout_user(token: str) -> bool:
                         if key.strip() != "MINI_LLM_CHAT_TOKEN":
                             env_vars[key.strip()] = value.strip()
 
-            # Write back without token
             with open(env_file, "w") as f:
                 f.write("# Mini LLM Chat Environment Variables\n")
                 for key, value in env_vars.items():

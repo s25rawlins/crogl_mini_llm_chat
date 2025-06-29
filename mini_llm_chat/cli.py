@@ -1,24 +1,10 @@
-"""
-Command Line Interface Module
-
-This module handles the command-line interface for the Mini LLM Chat application.
-It uses argparse to parse command-line arguments, sets up logging, validates
-configuration, and launches the chat REPL.
-
-The CLI provides a user-friendly way to configure the application without
-modifying code, supporting both command-line arguments and environment variables
-for flexible deployment scenarios.
-"""
-
 import argparse
 import logging
 import os
 import sys
 
-# Third-party imports
 from dotenv import load_dotenv
 
-# Local imports
 from mini_llm_chat.auth import setup_initial_admin
 from mini_llm_chat.chat import run_chat_repl, validate_api_key
 from mini_llm_chat.database_manager import DatabaseConnectionError, initialize_database
@@ -26,27 +12,6 @@ from mini_llm_chat.logging_hygiene import setup_secure_logging
 
 
 def create_argument_parser() -> argparse.ArgumentParser:
-    """
-    Create and configure the argument parser for the CLI.
-
-    This function sets up all command-line arguments with appropriate defaults,
-    help text, and validation. It supports both required and optional arguments
-    with sensible fallbacks to environment variables.
-
-    Returns:
-        argparse.ArgumentParser: Configured argument parser
-
-    Design Decisions:
-    - Uses environment variables as defaults for sensitive data (API keys)
-    - Provides reasonable defaults for rate limiting to prevent abuse
-    - Includes comprehensive help text for user guidance
-    - Supports standard logging levels for debugging
-
-    Alternative Approaches Considered:
-    - Click library: More powerful but adds dependency
-    - Configuration files: More complex but better for advanced users
-    - Interactive prompts: More user-friendly but less scriptable
-    """
     parser = argparse.ArgumentParser(
         prog="mini-llm-chat",
         description=(
@@ -189,79 +154,33 @@ def create_argument_parser() -> argparse.ArgumentParser:
 
 
 def setup_logging(log_level: str) -> None:
-    """
-    Configure logging for the application.
-
-    This sets up structured logging with timestamps and appropriate formatting
-    for both console output and potential file logging.
-
-    Args:
-        log_level (str): Logging level (DEBUG, INFO, WARNING, ERROR, CRITICAL)
-
-    Design Decisions:
-    - Uses structured logging with timestamps for debugging
-    - Includes module names to help identify log sources
-    - Uses appropriate log levels for different types of information
-    - Configures both console and potential file output
-
-    Alternative Approaches Considered:
-    - JSON logging: Better for log aggregation but less readable
-    - Separate loggers per module: More granular but more complex
-    - File rotation: Better for production but adds complexity
-    """
-    # Convert string level to logging constant
     numeric_level = getattr(logging, log_level.upper(), None)
     if not isinstance(numeric_level, int):
         raise ValueError(f"Invalid log level: {log_level}")
 
-    # Configure logging format
     log_format = "%(asctime)s [%(levelname)8s] %(name)s: %(message)s"
-
-    # Configure date format
     date_format = "%Y-%m-%d %H:%M:%S"
 
-    # Set up basic logging configuration
     logging.basicConfig(
         level=numeric_level,
         format=log_format,
         datefmt=date_format,
-        handlers=[
-            # Console handler for immediate feedback
-            logging.StreamHandler(sys.stdout)
-        ],
+        handlers=[logging.StreamHandler(sys.stdout)],
     )
 
-    # Set up logger for this module
     logger = logging.getLogger(__name__)
     logger.debug(f"Logging configured at {log_level} level")
 
-    # Reduce noise from third-party libraries
-    # OpenAI library can be quite verbose at DEBUG level
+    # Quiet noisy third-party loggers
     logging.getLogger("openai").setLevel(logging.WARNING)
     logging.getLogger("httpx").setLevel(logging.WARNING)
     logging.getLogger("urllib3").setLevel(logging.WARNING)
 
 
 def validate_arguments(args: argparse.Namespace) -> bool:
-    """
-    Validate parsed command-line arguments.
-
-    This function performs comprehensive validation of all arguments
-    to catch configuration errors early and provide helpful error messages.
-
-    Args:
-        args (argparse.Namespace): Parsed command-line arguments
-
-    Returns:
-        bool: True if all arguments are valid, False otherwise
-
-    Side Effects:
-        Prints error messages for invalid arguments
-    """
     logger = logging.getLogger(__name__)
     valid = True
 
-    # Validate API key
     if not args.api_key:
         print("Error: OpenAI API key is required.")
         print("   Use --api-key argument or set OPENAI_API_KEY environment variable.")
@@ -276,7 +195,6 @@ def validate_arguments(args: argparse.Namespace) -> bool:
     else:
         logger.debug("API key format validation passed")
 
-    # Validate rate limiting parameters
     if args.max_calls <= 0:
         print(f"Error: max-calls must be positive (got {args.max_calls})")
         valid = False
@@ -297,17 +215,15 @@ def validate_arguments(args: argparse.Namespace) -> bool:
         )
         logger.warning(f"Short time_window value: {args.time_window}")
 
-    # Calculate and warn about rate if it's very high
     if valid and args.max_calls > 0 and args.time_window > 0:
         rate_per_minute = (args.max_calls / args.time_window) * 60
-        if rate_per_minute > 30:  # More than 30 calls per minute
+        if rate_per_minute > 30:
             print(
                 f"Warning: High API call rate ({rate_per_minute:.1f} calls/minute). "
                 f"This could result in significant costs."
             )
             logger.warning(f"High API call rate: {rate_per_minute:.1f} calls/minute")
 
-    # Validate configuration file if provided (for future use)
     if args.config:
         if not os.path.exists(args.config):
             print(f"Error: Configuration file not found: {args.config}")
@@ -319,20 +235,10 @@ def validate_arguments(args: argparse.Namespace) -> bool:
 
 
 def display_startup_info(args: argparse.Namespace) -> None:
-    """
-    Display startup information to the user.
-
-    This provides useful information about the current configuration
-    without revealing sensitive data like API keys.
-
-    Args:
-        args (argparse.Namespace): Parsed command-line arguments
-    """
     print("Starting Mini LLM Chat...")
     print(f"   Rate Limit: {args.max_calls} calls per {args.time_window} seconds")
     print(f"   Log Level: {args.log_level}")
 
-    # Show API key status without revealing the key
     if args.api_key:
         key_preview = (
             args.api_key[:7] + "..." + args.api_key[-4:]
@@ -345,45 +251,12 @@ def display_startup_info(args: argparse.Namespace) -> None:
 
 
 def main() -> None:
-    """
-    Main entry point for the CLI application.
-
-    This function orchestrates the entire application startup:
-    1. Load environment variables from .env file
-    2. Parse command-line arguments
-    3. Set up logging
-    4. Validate configuration
-    5. Display startup information
-    6. Launch the chat REPL
-
-    The function handles errors gracefully and provides appropriate
-    exit codes for different failure scenarios.
-
-    Exit Codes:
-        0: Success
-        1: Configuration error (invalid arguments)
-        2: Runtime error (unexpected exception)
-
-    Design Decisions:
-    - Validates all inputs before starting the application
-    - Provides clear error messages for common issues
-    - Uses appropriate exit codes for scripting
-    - Handles exceptions gracefully without exposing stack traces to users
-
-    Alternative Approaches Considered:
-    - Interactive configuration: More user-friendly but less scriptable
-    - Configuration wizard: Helpful for first-time users but adds complexity
-    - Multiple subcommands: More powerful but unnecessary for this simple tool
-    """
     try:
-        # Load environment variables from .env file
         load_dotenv()
 
-        # Parse command-line arguments
         parser = create_argument_parser()
         args = parser.parse_args()
 
-        # Set up secure logging as early as possible
         setup_secure_logging()
         setup_logging(args.log_level)
         logger = logging.getLogger(__name__)
@@ -394,7 +267,6 @@ def main() -> None:
             f"time_window={args.time_window}, log_level={args.log_level}"
         )
 
-        # Handle setup commands first (these don't require API key)
         if args.init_db:
             print("Initializing database...")
             try:
